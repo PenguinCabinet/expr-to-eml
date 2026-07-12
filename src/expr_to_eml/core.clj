@@ -60,6 +60,86 @@
 (defn- mul-tree [x y] 
   (exp-tree (add-tree (ln-tree x) (ln-tree y))))
 
+;; Derived scientific-calculator primitives. Every helper returns a tree whose
+;; only numeric terminal is 1.
+(defn- inv-tree [x] (div-tree one x))
+
+(defn- half-tree [x] (div-tree x (add-tree one one)))
+
+(defn- square-tree [x] (mul-tree x x))
+
+(defn- pow-tree [x y]
+  (exp-tree (mul-tree y (ln-tree x))))
+
+(defn- sqrt-tree [x]
+  (pow-tree x (half-tree one)))
+
+(defn- e-tree [] (exp-tree one))
+
+(defn- i-tree []
+  (sqrt-tree (neg-tree one)))
+
+(defn- pi-tree []
+  (neg-tree (mul-tree (i-tree) (ln-tree (neg-tree one)))))
+
+(defn- sigmoid-tree [x]
+  (inv-tree (add-tree one (exp-tree (neg-tree x)))))
+
+(defn- sinh-tree [x]
+  (half-tree (sub-tree (exp-tree x) (exp-tree (neg-tree x)))))
+
+(defn- cosh-tree [x]
+  (half-tree (add-tree (exp-tree x) (exp-tree (neg-tree x)))))
+
+(defn- tanh-tree [x]
+  (div-tree (sinh-tree x) (cosh-tree x)))
+
+(defn- sin-tree [x]
+  (let [ix (mul-tree (i-tree) x)]
+    (div-tree (sub-tree (exp-tree ix) (exp-tree (neg-tree ix)))
+              (mul-tree (add-tree one one) (i-tree)))))
+
+(defn- cos-tree [x]
+  (let [ix (mul-tree (i-tree) x)]
+    (half-tree (add-tree (exp-tree ix) (exp-tree (neg-tree ix))))))
+
+(defn- tan-tree [x]
+  (div-tree (sin-tree x) (cos-tree x)))
+
+(defn- arsinh-tree [x]
+  (ln-tree (add-tree x (sqrt-tree (add-tree (square-tree x) one)))))
+
+(defn- arcosh-tree [x]
+  (ln-tree (add-tree x (sqrt-tree (sub-tree (square-tree x) one)))))
+
+(defn- artanh-tree [x]
+  (half-tree (ln-tree (div-tree (add-tree one x) (sub-tree one x)))))
+
+(defn- arcsin-tree [x]
+  (neg-tree
+   (mul-tree
+    (i-tree)
+    (ln-tree (add-tree (mul-tree (i-tree) x)
+                       (sqrt-tree (sub-tree one (square-tree x))))))))
+
+(defn- arccos-tree [x]
+  (sub-tree (half-tree (pi-tree)) (arcsin-tree x)))
+
+(defn- arctan-tree [x]
+  (let [ix (mul-tree (i-tree) x)]
+    (div-tree (sub-tree (ln-tree (add-tree one ix))
+                        (ln-tree (sub-tree one ix)))
+              (mul-tree (add-tree one one) (i-tree)))))
+
+(defn- log-base-tree [base x]
+  (div-tree (ln-tree x) (ln-tree base)))
+
+(defn- avg-tree [x y]
+  (half-tree (add-tree x y)))
+
+(defn- hypot-tree [x y]
+  (sqrt-tree (add-tree (square-tree x) (square-tree y))))
+
 (defn- int->tree [n]
   (cond
     (= n 1) one
@@ -90,11 +170,27 @@
     1 (div-tree one (expr->eml-tree (first args)))
     (reduce div-tree (compile-args args))))
 
+(defn- compile-unary [op args tree-fn]
+  (when-not (= 1 (count args))
+    (throw (ex-info (str "'" op "' requires exactly one operand")
+                    {:operator op :arity (count args)})))
+  (tree-fn (expr->eml-tree (first args))))
+
+(defn- compile-binary [op args tree-fn]
+  (when-not (= 2 (count args))
+    (throw (ex-info (str "'" op "' requires exactly two operands")
+                    {:operator op :arity (count args)})))
+  (tree-fn (expr->eml-tree (first args))
+           (expr->eml-tree (second args))))
+
 (defn expr->eml-tree [expr]
   (cond
     (integer? expr) (int->tree expr)
     (ratio? expr) (div-tree (int->tree (numerator expr))
                             (int->tree (denominator expr)))
+    (= 'e expr) (e-tree)
+    (= 'i expr) (i-tree)
+    (= 'pi expr) (pi-tree)
     (symbol? expr) expr
     (list? expr)
     (let [[op & args] expr]
@@ -103,6 +199,31 @@
         - (compile-sub args)
         * (compile-mul args)
         / (compile-div args)
+        exp (compile-unary op args exp-tree)
+        ln (compile-unary op args ln-tree)
+        inv (compile-unary op args inv-tree)
+        half (compile-unary op args half-tree)
+        minus (compile-unary op args neg-tree)
+        sqrt (compile-unary op args sqrt-tree)
+        sqr (compile-unary op args square-tree)
+        sigma (compile-unary op args sigmoid-tree)
+        sigmoid (compile-unary op args sigmoid-tree)
+        sin (compile-unary op args sin-tree)
+        cos (compile-unary op args cos-tree)
+        tan (compile-unary op args tan-tree)
+        arcsin (compile-unary op args arcsin-tree)
+        arccos (compile-unary op args arccos-tree)
+        arctan (compile-unary op args arctan-tree)
+        sinh (compile-unary op args sinh-tree)
+        cosh (compile-unary op args cosh-tree)
+        tanh (compile-unary op args tanh-tree)
+        arsinh (compile-unary op args arsinh-tree)
+        arcosh (compile-unary op args arcosh-tree)
+        artanh (compile-unary op args artanh-tree)
+        pow (compile-binary op args pow-tree)
+        log (compile-binary op args log-base-tree)
+        avg (compile-binary op args avg-tree)
+        hypot (compile-binary op args hypot-tree)
         (throw (ex-info (str "Unsupported operator: " op) {:operator op}))))
     :else (throw (ex-info (str "Unsupported expression: " (pr-str expr))
                           {:expression expr}))))

@@ -115,3 +115,88 @@
   (is (thrown-with-msg? clojure.lang.ExceptionInfo
                         #"Invalid EML tree node"
                         (evaluate-eml '(eml 1 1 1) {}))))
+
+(deftest eml-constants-test
+  (is (near= Math/E (evaluate-eml (expr->eml-tree 'e) {})))
+  (is (near= Math/PI (evaluate-eml (expr->eml-tree 'pi) {})))
+  (let [value (evaluate-eml (expr->eml-tree 'i) {})]
+    (is (near= 0.0 (:re value)))
+    (is (near= 1.0 (:im value))))
+  (doseq [constant ['e 'i 'pi -1 1 2]]
+    (is (pure-eml-tree? (expr->eml-tree constant) #{})
+        (str "constant did not compile to pure EML: " constant))))
+
+(deftest elementary-unary-functions-test
+  (doseq [[expr expected]
+          [['(exp 1/2) (Math/exp 0.5)]
+           ['(ln 2) (Math/log 2.0)]
+           ['(inv 4) 0.25]
+           ['(half 3) 1.5]
+           ['(minus 2) -2.0]
+           ['(sqrt 4) 2.0]
+           ['(sqr 3) 9.0]
+           ['(sigma 0) 0.5]
+           ['(sigmoid 0) 0.5]]]
+    (is (near= expected (evaluate-eml (expr->eml-tree expr) {}))
+        (str "failed to evaluate " expr))
+    (is (pure-eml-tree? (expr->eml-tree expr) #{})
+        (str "function did not compile to pure EML: " expr)))
+  (let [value (evaluate-eml (expr->eml-tree '(ln -2)) {})]
+    (is (near= (Math/log 2.0) (:re value)))
+    (is (near= Math/PI (:im value)))))
+
+(deftest trigonometric-functions-test
+  (doseq [[expr expected]
+          [['(sin 1/2) (Math/sin 0.5)]
+           ['(cos 1/2) (Math/cos 0.5)]
+           ['(tan 1/2) (Math/tan 0.5)]
+           ['(arcsin 1/2) (Math/asin 0.5)]
+           ['(arccos 1/2) (Math/acos 0.5)]
+           ['(arctan 1/2) (Math/atan 0.5)]]]
+    (is (near= expected (evaluate-eml (expr->eml-tree expr) {}))
+        (str "failed to evaluate " expr))
+    (is (pure-eml-tree? (expr->eml-tree expr) #{})
+        (str "function did not compile to pure EML: " expr))))
+
+(deftest hyperbolic-functions-test
+  (doseq [[expr expected]
+          [['(sinh 1/2) (Math/sinh 0.5)]
+           ['(cosh 1/2) (Math/cosh 0.5)]
+           ['(tanh 1/2) (Math/tanh 0.5)]
+           ['(arsinh 1/2) (Math/log (+ 0.5 (Math/sqrt 1.25)))]
+           ['(arcosh 2) (Math/log (+ 2.0 (Math/sqrt 3.0)))]
+           ['(artanh 1/2) (* 0.5 (Math/log 3.0))]]]
+    (is (near= expected (evaluate-eml (expr->eml-tree expr) {}))
+        (str "failed to evaluate " expr))
+    (is (pure-eml-tree? (expr->eml-tree expr) #{})
+        (str "function did not compile to pure EML: " expr))))
+
+(deftest additional-binary-operators-test
+  (doseq [[expr expected]
+          [['(pow 2 3) 8.0]
+           ['(log 2 8) 3.0]
+           ['(avg 2 4) 3.0]
+           ['(hypot 3 4) 5.0]]]
+    (is (near= expected (evaluate-eml (expr->eml-tree expr) {}))
+        (str "failed to evaluate " expr))
+    (is (pure-eml-tree? (expr->eml-tree expr) #{})
+        (str "operator did not compile to pure EML: " expr))))
+
+(deftest composed-elementary-expression-test
+  (let [expr '(+ (sin (/ pi 2))
+                 (log 2 (pow 2 3))
+                 (hypot 3 4))]
+    (is (near= 9.0 (evaluate-eml (expr->eml-tree expr) {})))
+    (is (pure-eml-tree? (expr->eml-tree expr) #{})))
+  (let [expr '(avg (sqr x) (cosh x))
+        tree (expr->eml-tree expr)]
+    (is (near= (/ (+ 0.25 (Math/cosh 0.5)) 2.0)
+               (evaluate-eml tree {'x 0.5})))
+    (is (pure-eml-tree? tree '#{x}))))
+
+(deftest scientific-operator-arity-test
+  (doseq [expr ['(sin) '(sqrt 1 2) '(pow 2) '(hypot 3 4 5)]]
+    (is (thrown-with-msg? clojure.lang.ExceptionInfo
+                          #"requires exactly"
+                          (expr->eml-tree expr))
+        (str "invalid arity was accepted: " expr))))

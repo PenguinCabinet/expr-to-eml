@@ -21,5 +21,37 @@ Result: 13.0
 Expected (Clojure): 13
 ````
 
+## 対応する式
+
+論文 Table 1 の科学計算機プリミティブをS式から純粋EMLツリーへ変換します。
+
+```clojure
+;; 定数
+e i pi -1 1 2
+
+;; 四則演算（可変長）
+(+ x y) (- x y) (* x y) (/ x y)
+
+;; 基本単項関数
+(exp x) (ln x) (inv x) (half x) (minus x)
+(sqrt x) (sqr x) (sigma x)
+
+;; 三角関数・逆三角関数
+(sin x) (cos x) (tan x)
+(arcsin x) (arccos x) (arctan x)
+
+;; 双曲線関数・逆双曲線関数
+(sinh x) (cosh x) (tanh x)
+(arsinh x) (arcosh x) (artanh x)
+
+;; 二項演算
+(pow x y)   ; x^y
+(log x y)   ; log_x(y): xを底とするyの対数
+(avg x y)   ; (x+y)/2
+(hypot x y) ; sqrt(x^2+y^2)
+```
+
+`sigmoid` は `sigma` の別名としても使用できます。`x`、`y` など、予約済み定数以外のシンボルは入力変数として扱われます。
+
 
 
