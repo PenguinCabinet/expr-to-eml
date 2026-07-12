@@ -1,57 +1,114 @@
-# expr-to-eml.clj
-Clojureで実装した、四則演算のS木をeml関数と1と代数に変換するライブラリです。
+# expr-to-eml
 
-This is a Clojure library that converts S-trees of arithmetic operations into eml functions, 1, and algebraic numbers.
+A Clojure library that compiles mathematical S-expressions into EML trees containing only `eml(x, y) = exp(x) - log(y)`, the constant `1`, and input variables.
 
-整数・有理数・変数からなる四則演算式に対応し、負数を含む式は主値複素対数を使って内部評価します。
-変換結果の終端は `1` と入力変数だけです。浮動小数点リテラルは正確な純粋EML表現ではないため受け付けません。
+Based on [All elementary functions from a single binary operator](https://arxiv.org/abs/2603.21852).
 
-[https://arxiv.org/pdf/2603.21852](https://arxiv.org/pdf/2603.21852)
+## Installation
 
-## 実行例
-```
-clojure -M -m expr-to-eml.core
-```
+### Git dependency
 
-```
-Expression: (+ a (* b (- a 1)))
-EML Tree: (eml (eml 1 (eml (eml 1 a) 1)) (eml (eml (eml 1 (eml (eml 1 (eml 1 (eml (eml 1 1) 1))) 1)) (eml (eml (eml (eml 1 (eml (eml 1 (eml 1 (eml (eml 1 b) 1))) 1)) (eml (eml (eml 1 (eml (eml 1 (eml 1 (eml (eml 1 1) 1))) 1)) (eml (eml 1 (eml (eml 1 (eml (eml 1 (eml (eml 1 a) 1)) (eml 1 1))) 1)) 1)) 1)) 1) 1)) 1))
-Evaluating with a=5, b=2...
-Result: 13.0
-Expected (Clojure): 13
-````
-
-## 対応する式
-
-論文 Table 1 の科学計算機プリミティブをS式から純粋EMLツリーへ変換します。
+Add the library to the consumer project's `deps.edn`. Replace `COMMIT_SHA` with the SHA of a pushed commit containing this version. Uncommitted or unpushed changes cannot be used as a Git dependency.
 
 ```clojure
-;; 定数
-e i pi -1 1 2
+{:deps
+ {io.github.penguincabinet/expr-to-eml
+  {:git/url "https://github.com/PenguinCabinet/expr-to-eml.git"
+   :git/sha "COMMIT_SHA"}}}
+```
 
-;; 四則演算（可変長）
+### Local checkout
+
+```clojure
+{:deps
+ {io.github.penguincabinet/expr-to-eml
+  {:local/root "../expr-to-eml"}}}
+```
+
+## Usage
+
+```clojure
+(ns example.core
+  (:require [expr-to-eml.core :as eml]))
+
+(def tree
+  (eml/expr->eml-tree
+   '(+ (sin (/ pi 2)) (hypot 3 4))))
+
+(eml/evaluate-eml tree {})
+;; => approximately 6.0
+```
+
+Variables are supplied as symbol-to-value bindings:
+
+```clojure
+(def variable-tree
+  (eml/expr->eml-tree '(avg (sqr x) (cosh x))))
+
+(eml/evaluate-eml variable-tree {'x 1/2})
+```
+
+## Public API
+
+- `expr->eml-tree` — compiles an S-expression into a pure EML tree
+- `evaluate-eml` — evaluates an EML tree with optional variable bindings
+
+Input expressions accept integers, Clojure ratios such as `1/2`, and variables. Symbols other than reserved constants are treated as input variables. Expressions involving negative numbers are evaluated internally with the principal complex logarithm.
+
+## Supported expressions
+
+```clojure
+;; Constants
+e i pi
+
+;; Variadic arithmetic
 (+ x y) (- x y) (* x y) (/ x y)
 
-;; 基本単項関数
+;; Basic functions
 (exp x) (ln x) (inv x) (half x) (minus x)
 (sqrt x) (sqr x) (sigma x)
 
-;; 三角関数・逆三角関数
+;; Trigonometric and inverse trigonometric functions
 (sin x) (cos x) (tan x)
 (arcsin x) (arccos x) (arctan x)
 
-;; 双曲線関数・逆双曲線関数
+;; Hyperbolic and inverse hyperbolic functions
 (sinh x) (cosh x) (tanh x)
 (arsinh x) (arcosh x) (artanh x)
 
-;; 二項演算
-(pow x y)   ; x^y
-(log x y)   ; log_x(y): xを底とするyの対数
-(avg x y)   ; (x+y)/2
-(hypot x y) ; sqrt(x^2+y^2)
+;; Other binary operations
+(pow x y)   ; x raised to y
+(log x y)   ; logarithm of y in base x
+(avg x y)   ; (x + y) / 2
+(hypot x y) ; sqrt(x^2 + y^2)
 ```
 
-`sigmoid` は `sigma` の別名としても使用できます。`x`、`y` など、予約済み定数以外のシンボルは入力変数として扱われます。
+`sigmoid` is accepted as an alias for `sigma`.
 
+## Development
 
+Run the test suite:
 
+```powershell
+clojure -M:test -e "(require 'expr-to-eml.core-test)(clojure.test/run-tests 'expr-to-eml.core-test)"
+```
+
+Build a JAR:
+
+```powershell
+clojure -T:build jar
+```
+
+Install the package into the local Maven repository:
+
+```powershell
+clojure -T:build install
+```
+
+The locally installed dependency can then be referenced as:
+
+```clojure
+{:deps
+ {io.github.penguincabinet/expr-to-eml
+  {:mvn/version "0.1.0-SNAPSHOT"}}}
+```

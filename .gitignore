@@ -3,4 +3,5 @@ core.*
 .cpcache
 .clj-kondo
 .lsp
+/target/
 

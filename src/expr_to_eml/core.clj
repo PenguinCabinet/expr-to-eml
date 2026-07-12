@@ -183,7 +183,12 @@
   (tree-fn (expr->eml-tree (first args))
            (expr->eml-tree (second args))))
 
-(defn expr->eml-tree [expr]
+(defn expr->eml-tree
+  "Compile a supported mathematical S-expression into a pure EML tree.
+
+  The resulting tree contains only `eml` nodes, the constant 1, and input
+  variables. Integers and Clojure ratios are accepted as exact constants."
+  [expr]
   (cond
     (integer? expr) (int->tree expr)
     (ratio? expr) (div-tree (int->tree (numerator expr))
@@ -228,7 +233,12 @@
     :else (throw (ex-info (str "Unsupported expression: " (pr-str expr))
                           {:expression expr}))))
 
-(defn evaluate-eml [tree env]
+(defn evaluate-eml
+  "Evaluate a pure EML tree with a map from variable symbols to numeric values.
+
+  Returns a double for a real result or a Complex record when a non-zero
+  imaginary component remains."
+  [tree env]
   (letfn [(evaluate [node]
             (cond
               (= node one) (->complex one)
