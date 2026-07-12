@@ -3,6 +3,9 @@ Clojureで実装した、四則演算のS木をeml関数と1と代数に変換�
 
 This is a Clojure library that converts S-trees of arithmetic operations into eml functions, 1, and algebraic numbers.
 
+整数・有理数・変数からなる四則演算式に対応し、負数を含む式は主値複素対数を使って内部評価します。
+変換結果の終端は `1` と入力変数だけです。浮動小数点リテラルは正確な純粋EML表現ではないため受け付けません。
+
 [https://arxiv.org/pdf/2603.21852](https://arxiv.org/pdf/2603.21852)
 
 ## 実行例
